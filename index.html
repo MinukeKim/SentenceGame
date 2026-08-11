@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AX Lab 문장 게임</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Noto+Sans+KR:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #050505; overflow: hidden;
+            font-family: 'Noto Sans KR', 'Cinzel', serif; user-select: none; touch-action: none;
+        }
+
+        #blurred-bg {
+            position: absolute; top: -5%; left: -5%; width: 110vw; height: 110vh;
+            filter: blur(50px) brightness(0.6); 
+            z-index: 0; transition: background 1s ease;
+        }
+
+        #game-wrapper {
+            position: absolute; top: 50%; left: 50%;
+            width: 1280px; height: 720px;
+            transform-origin: center;
+            transform: translate(-50%, -50%) scale(1);
+            background-color: #000; overflow: hidden;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.9), 0 0 2px rgba(255,255,255,0.2); 
+            z-index: 1; 
+        }
+
+        #gameCanvas {
+            display: block; width: 1280px; height: 720px;
+            transition: background 1s ease;
+        }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 1280px; height: 720px;
+            pointer-events: none; z-index: 10;
+        }
+
+        #ui-top {
+            position: absolute; top: 25px; left: 40px; right: 40px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+
+        #score-panel { display: flex; flex-direction: column; gap: 6px; }
+        
+        .ui-text { 
+            font-size: 24px; color: #F4D03F; font-weight: 800; 
+            text-shadow: 2px 2px 4px #3E2723, -1px -1px 2px #000; 
+            letter-spacing: 1px;
+        }
+        #stage-board { color: #FFF3E0; font-size: 22px; }
+        
+        #sentence-board-container {
+            position: absolute;
+            top: 25%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+        }
+        #sentence-board { 
+            font-size: 32px; color: #555; font-weight: 800; 
+            text-align: center;
+            background: #f4f4f4; padding: 20px 30px; border-radius: 12px;
+            border: 1px solid #aaa;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        
+        .pattern-filled { 
+            background-color: #388E3C; color: #fff; padding: 5px 15px; border-radius: 4px;
+            min-width: 40px; text-align: center;
+        }
+        .pattern-empty { 
+            background-color: #388E3C; color: transparent; padding: 5px 25px; border-radius: 4px;
+            min-width: 40px; display: inline-block;
+        }
+        
+        #hearts { font-size: 36px; letter-spacing: 6px; text-shadow: 2px 2px 5px #000; }
+
+        .game-btn {
+            pointer-events: auto; 
+            background: linear-gradient(180deg, #E5C07B 0%, #D4AF37 100%);
+            color: #3E2723; border: 3px solid #5D4037; 
+            padding: 10px 24px; font-size: 22px; font-weight: 800; 
+            font-family: 'Noto Sans KR', serif; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 5px 0 #5D4037, 0 8px 12px rgba(0,0,0,0.6); 
+            transition: 0.1s;
+        }
+        .game-btn:hover { 
+            background: linear-gradient(180deg, #F4D03F 0%, #E5C07B 100%); 
+            transform: translateY(-2px); box-shadow: 0 7px 0 #5D4037, 0 12px 16px rgba(0,0,0,0.6); 
+        }
+        .game-btn:active { transform: translateY(5px); box-shadow: none; }
+
+        #message {
+            pointer-events: auto; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); text-align: center;
+            background: #F5E6CC;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23n)" opacity="0.08"/></svg>');
+            padding: 40px 60px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.9), inset 0 0 30px rgba(93,64,55,0.4);
+            border: 8px solid #3E2723; display: none; border-radius: 12px;
+            width: 800px;
+        }
+        #message h1 { font-size: 38px; color: #B71C1C; margin: 0 0 20px 0; text-shadow: 1px 1px 0px #F4D03F; }
+        #message p { font-size: 20px; color: #3E2723; margin: 0 0 30px 0; font-weight: 700; text-align: left; line-height: 1.6; }
+        
+        #damage-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 80px rgba(255, 0, 0, 0); pointer-events: none;
+            transition: box-shadow 0.2s ease; z-index: 20;
+        }
+        .red-flash { box-shadow: inset 0 0 150px rgba(255, 0, 0, 0.9) !important; }
+    </style>
+</head>
+<body>
+    <div id="blurred-bg"></div>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+        <div id="ui-layer">
+            <div id="damage-overlay"></div>
+            
+            <div id="ui-top">
+                <div id="score-panel">
+                    <div id="stage-board" class="ui-text">STAGE 1: DESERT</div>
+                    <div id="score-board" class="ui-text">SCORE: 0</div>
+                </div>
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div id="hearts">❤️❤️❤️</div>
+                    <button class="game-btn" id="pause-btn" style="display:none;">PAUSE</button>
+                </div>
+            </div>
+
+            <div id="sentence-board-container">
+                <div id="sentence-board"></div>
+            </div>
+
+            <div id="message">
+                <h1 id="msg-title">로딩 중...</h1>
+                <p id="msg-desc">에셋을 불러오는 중입니다.</p>
+                <button class="game-btn" id="start-action-btn" style="display:none;">[게임시작]</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const wrapper = document.getElementById('game-wrapper');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const blurredBg = document.getElementById('blurred-bg'); 
+
+    function resize() {
+        const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+        wrapper.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+    window.addEventListener('resize', resize);
+    resize(); 
+
+    const scoreBoard = document.getElementById('score-board');
+    const stageBoard = document.getElementById('stage-board');
+    const sentenceBoard = document.getElementById('sentence-board');
+    const heartsBoard = document.getElementById('hearts');
+    const msgBox = document.getElementById('message');
+    const msgTitle = document.getElementById('msg-title');
+    const msgDesc = document.getElementById('msg-desc');
+    const startBtn = document.getElementById('start-action-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const damageOverlay = document.getElementById('damage-overlay');
+
+    const stagesData = [
+        [ 
+            { words: ["It", "is", "a", "hot", "and", "big", "country."], blanks: [0, 1] },
+            { words: ["It", "is", "the", "Nile."], blanks: [0, 1] }
+        ],
+        [ 
+            { words: ["How", "do", "people", "move", "big", "stones?"], blanks: [0, 1, 2] },
+            { words: ["How", "do", "they", "build", "big", "pyramids?"], blanks: [0, 1, 2] }
+        ],
+        [ 
+            { words: ["They", "use", "force!"], blanks: [0, 1] },
+            { words: ["They", "also", "push", "the", "big", "stones."], blanks: [0, 1] },
+            { words: ["They", "use", "smart", "tools,", "too."], blanks: [0, 1] }
+        ]
+    ];
+
+    let state = {
+        isPlaying: false, isPaused: false, isCleared: false,
+        waitingNextStage: false, // 💡 스테이지 전환 대기 상태 추가
+        score: 0, lives: 3, stage: 1, 
+        currentSentenceIndex: 0, currentBlankIndex: 0,
+        speedMult: 1.0, jumpCount: 0, groundY: 0
+    };
+
+    const images = {};
+    let imagesLoaded = 0;
+    const imageSources = {
+        run1: '런1.png', run2: '런2.png', run3: '런3.png', run4: '런4.png',
+        jump1: '점프1.png', jump2: '점프2.png'
+    };
+    const totalImages = Object.keys(imageSources).length;
+
+    const cw = 1280; const ch = 720;
+    state.groundY = Math.round(ch * 0.85); 
+
+    let clouds = []; let desertBgItems = []; let grasslandBgItems = []; let iceBgItems = []; 
+    let stars = []; let particles = []; let fireworks = [];
+
+    // TTS 설정
+    let ttsVoice = null;
+    function initTTS() {
+        const voices = window.speechSynthesis.getVoices();
+        ttsVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Zira') || v.name.includes('Google US English'))) 
+                || voices.find(v => v.lang.startsWith('en')) 
+                || voices[0];
+    }
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = initTTS;
+    }
+    
+    function playTTS(text) {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        
+        let cleanText = text.replace(/[\.\?\,!]/g, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        utterance.lang = 'en-US';
+        utterance.rate = 0.95; 
+        utterance.pitch = 1.1; 
+        if (ttsVoice) utterance.voice = ttsVoice;
+        
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function initBackgroundObjects() {
+        clouds = [
+            { x: cw * 0.1, y: ch * 0.12, w: 120, h: 40, speed: 0.3 },
+            { x: cw * 0.5, y: ch * 0.20, w: 180, h: 55, speed: 0.2 },
+            { x: cw * 0.85, y: ch * 0.08, w: 100, h: 35, speed: 0.25 }
+        ];
+        desertBgItems = [
+            { type: 'pyramid_large', x: cw * 0.08, w: ch * 0.45, h: ch * 0.28, speed: 0.25 },
+            { type: 'pyramid_small', x: cw * 0.22, w: ch * 0.32, h: ch * 0.20, speed: 0.25 },
+            { type: 'sphinx',        x: cw * 0.72, w: ch * 0.38, h: ch * 0.18, speed: 0.28 }
+        ];
+        grasslandBgItems = [
+            { x: cw * 0.0, w: cw * 0.4, h: ch * 0.12, speed: 0.4 },
+            { x: cw * 0.3, w: cw * 0.5, h: ch * 0.15, speed: 0.35 },
+            { x: cw * 0.7, w: cw * 0.6, h: ch * 0.10, speed: 0.38 },
+            { x: cw * 1.1, w: cw * 0.4, h: ch * 0.13, speed: 0.36 }
+        ];
+        iceBgItems = [
+            { x: cw * 0.0, w: ch * 0.3, h: ch * 0.22, speed: 0.3 },
+            { x: cw * 0.35, w: ch * 0.4, h: ch * 0.3, speed: 0.25 },
+            { x: cw * 0.8, w: ch * 0.35, h: ch * 0.25, speed: 0.28 }
+        ];
+        stars = [];
+        for(let i = 0; i < 60; i++) {
+            stars.push({
+                x: Math.random() * cw, y: Math.random() * (ch * 0.5), 
+                r: Math.random() * 1.5 + 0.5, opacity: Math.random() * 0.8 + 0.2,
+                twinkleSpeed: (Math.random() * 0.02) + 0.01
+            });
+        }
+    }
+
+    const dino = {
+        x: 0, y: 0, w: 0, h: 0, vy: 0, gravity: 0, isJumping: false,
+        isHolding: false,
+        frameTimer: 0, frameIndex: 1, hitShakeTimer: 0, hitShakeActive: false,
+
+        update(dt) {
+            this.h = Math.round(ch * 0.2);
+            this.w = Math.round(this.h * (384 / 216)); 
+            this.x = Math.round(cw * 0.1); 
+            this.gravity = ch * 0.0025 * (state.speedMult * state.speedMult); 
+            
+            const footOffset = Math.round(this.h * 0.22) - 15; 
+            const floorY = Math.round(state.groundY - this.h + footOffset);
+
+            if (this.isJumping) {
+                if (this.isHolding) {
+                    this.vy -= (ch * 0.002) * state.speedMult * (dt / 16); 
+                    if (this.vy < -(ch * 0.025) * state.speedMult) {
+                        this.vy = -(ch * 0.025) * state.speedMult;
+                    }
+                } else {
+                    this.vy += this.gravity * 1.5 * (dt / 16); 
+                }
+
+                this.y += this.vy * (dt / 16);
+
+                const ceilingY = ch * 0.38;
+                if (this.y < ceilingY) {
+                    this.y = ceilingY;
+                    this.vy = 0;
+                }
+
+                if (this.y >= floorY) { 
+                    this.y = floorY; 
+                    this.isJumping = false; 
+                    this.vy = 0; 
+                }
+            } else {
+                this.y = floorY;
+                if (state.isPlaying && !state.isPaused && !state.isCleared) {
+                    this.frameTimer += dt;
+                    if (this.frameTimer > 120 / state.speedMult) {
+                        this.frameIndex = this.frameIndex >= 4 ? 1 : this.frameIndex + 1;
+                        this.frameTimer = 0;
+                    }
+                } else { this.frameIndex = 1; }
+            }
+            if (this.hitShakeActive) {
+                this.hitShakeTimer += dt;
+                if (this.hitShakeTimer > 300) { this.hitShakeActive = false; this.hitShakeTimer = 0; }
+            }
+        },
+
+        drawShadow() {
+            const footOffset = Math.round(this.h * 0.22) - 15; 
+            const floorY = Math.round(state.groundY - this.h + footOffset);
+            const jumpHeight = Math.max(0, floorY - this.y);
+
+            ctx.save();
+            const shadowScale = Math.max(0.25, 1 - (jumpHeight / 200));
+            const shadowOpacity = Math.max(0.05, 0.35 - (jumpHeight / 400));
+            ctx.fillStyle = `rgba(0, 0, 0, ${shadowOpacity})`;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.round(this.x + this.w * 0.48), Math.round(state.groundY + 7), 
+                Math.round((this.w * 0.16) * shadowScale), Math.round((this.h * 0.03) * shadowScale), 
+                0, 0, Math.PI * 2
+            );
+            ctx.fill(); ctx.restore();
+        },
+
+        draw() {
+            let img = this.isJumping ? ((this.vy < 0 && this.y > ch * 0.1) ? images.jump2 : images.jump1) : images[`run${this.frameIndex}`];
+            let drawX = this.x; let drawY = this.y;
+            if (this.hitShakeActive) { drawX += (Math.random() - 0.5) * 15; drawY += (Math.random() - 0.5) * 5; }
+            
+            if(img && img.complete && img.naturalWidth !== 0) {
+                ctx.drawImage(img, drawX, drawY, this.w, this.h);
+            } else {
+                ctx.fillStyle = '#8D6E63'; drawRoundedRect(ctx, drawX + this.w*0.2, drawY, this.w*0.6, this.h, 20);
+                ctx.beginPath(); ctx.arc(drawX + this.w*0.25, drawY + 10, 15, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(drawX + this.w*0.75, drawY + 10, 15, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(drawX + this.w*0.4, drawY + this.h*0.3, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(drawX + this.w*0.6, drawY + this.h*0.3, 5, 0, Math.PI*2); ctx.fill();
+            }
+        },
+        
+        jump() {
+            if (!state.isPlaying || state.isPaused || state.isCleared || state.waitingNextStage) return;
+            this.isHolding = true; 
+            if (!this.isJumping) {
+                this.isJumping = true; state.jumpCount++;
+                state.speedMult = Math.min(1.8, 1 + (state.jumpCount * 0.007));
+                this.vy = -(ch * 0.025) * state.speedMult; 
+                playAudio('jump');
+            }
+        },
+        
+        releaseJump() {
+            this.isHolding = false; 
+        },
+        
+        triggerHitShake() { this.hitShakeActive = true; this.hitShakeTimer = 0; }
+    };
+
+    function drawSkyObjects(dt) {
+        ctx.save();
+        // 💡 [태양 고도 상승] 기존 0.18에서 0.08로 위치를 대폭 올려 텍스트 보드와 겹침 방지
+        let celestialX = cw * 0.5; let celestialY = ch * 0.08; let coreRadius = 30; 
+
+        if (state.stage === 1) { 
+            let grad = ctx.createRadialGradient(celestialX, celestialY, 10, celestialX, celestialY, 60);
+            grad.addColorStop(0, '#fff59d'); grad.addColorStop(0.5, '#ffb74d'); grad.addColorStop(1, 'rgba(255, 183, 77, 0)');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(celestialX, celestialY, 60, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffee58'; ctx.beginPath(); ctx.arc(celestialX, celestialY, coreRadius, 0, Math.PI*2); ctx.fill();
+        } else if (state.stage === 2) { 
+            ctx.fillStyle = '#fffde7'; ctx.beginPath(); ctx.arc(celestialX, celestialY, coreRadius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#281c3c'; ctx.beginPath(); ctx.arc(celestialX + 12, celestialY - 6, coreRadius, 0, Math.PI * 2); ctx.fill();
+        } else { 
+            stars.forEach(s => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+                if(!state.isPaused && !state.isCleared) {
+                    s.opacity += s.twinkleSpeed;
+                    if(s.opacity > 1 || s.opacity < 0.1) s.twinkleSpeed *= -1;
+                }
+            });
+            ctx.fillStyle = '#f5f5f5'; ctx.beginPath(); ctx.arc(celestialX, celestialY, coreRadius, 0, Math.PI*2); ctx.fill();
+            let moonGrad = ctx.createRadialGradient(celestialX, celestialY, coreRadius, celestialX, celestialY, coreRadius + 20);
+            moonGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)'); moonGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = moonGrad; ctx.beginPath(); ctx.arc(celestialX, celestialY, coreRadius + 20, 0, Math.PI*2); ctx.fill();
+        }
+
+        ctx.fillStyle = state.stage === 3 ? 'rgba(230, 245, 255, 0.5)' : 'rgba(255, 255, 255, 0.65)';
+        clouds.forEach(c => {
+            if(!state.isCleared && !state.waitingNextStage && !state.isPaused) c.x -= c.speed * state.speedMult * (dt / 16);
+            if (c.x + c.w < 0) c.x = cw + 50;
+            ctx.beginPath();
+            ctx.arc(c.x + c.w*0.3, c.y + c.h*0.5, c.h*0.5, 0, Math.PI*2);
+            ctx.arc(c.x + c.w*0.5, c.y + c.h*0.3, c.h*0.6, 0, Math.PI*2);
+            ctx.arc(c.x + c.w*0.7, c.y + c.h*0.5, c.h*0.4, 0, Math.PI*2); ctx.fill();
+        });
+
+        if (state.stage === 1) { 
+            desertBgItems.forEach(p => {
+                if(!state.isCleared && !state.waitingNextStage && !state.isPaused) p.x -= p.speed * state.speedMult * (dt / 16);
+                if (p.x + p.w < -300) p.x = cw + Math.random() * 200;
+                if (p.type === 'pyramid_large' || p.type === 'pyramid_small') {
+                    const peakX = p.x + p.w * 0.45; const peakY = state.groundY - p.h; const splitX = p.x + p.w * 0.55;
+                    ctx.fillStyle = '#C88033'; ctx.beginPath(); ctx.moveTo(p.x, state.groundY); ctx.lineTo(peakX, peakY); ctx.lineTo(splitX, state.groundY); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = '#7A4816'; ctx.beginPath(); ctx.moveTo(peakX, peakY); ctx.lineTo(p.x + p.w, state.groundY); ctx.lineTo(splitX, state.groundY); ctx.closePath(); ctx.fill();
+                } else if (p.type === 'sphinx') { 
+                    ctx.save(); ctx.translate(p.x, state.groundY); ctx.fillStyle = '#8B501B'; ctx.beginPath();
+                    ctx.moveTo(0, 0); ctx.lineTo(p.w * 0.95, 0); ctx.lineTo(p.w * 0.95, -p.h * 0.18); ctx.lineTo(p.w * 0.65, -p.h * 0.18); 
+                    ctx.lineTo(p.w * 0.72, -p.h * 0.50); ctx.lineTo(p.w * 0.85, -p.h * 0.62); ctx.lineTo(p.w * 0.90, -p.h * 0.75); 
+                    ctx.lineTo(p.w * 0.75, -p.h * 0.98); ctx.lineTo(p.w * 0.52, -p.h * 0.98); ctx.lineTo(p.w * 0.48, -p.h * 0.55); 
+                    ctx.lineTo(p.w * 0.15, -p.h * 0.35); ctx.lineTo(0, -p.h * 0.12); ctx.closePath(); ctx.fill(); ctx.restore();
+                }
+            });
+        } else if (state.stage === 2) { 
+            ctx.fillStyle = '#112411'; 
+            grasslandBgItems.forEach(p => {
+                if(!state.isCleared && !state.waitingNextStage && !state.isPaused) p.x -= p.speed * state.speedMult * (dt / 16);
+                if (p.x + p.w < -100) p.x = cw + Math.random() * 100;
+                ctx.beginPath(); ctx.moveTo(p.x, state.groundY);
+                ctx.quadraticCurveTo(p.x + p.w * 0.1, state.groundY - p.h, p.x + p.w * 0.5, state.groundY - p.h);
+                ctx.quadraticCurveTo(p.x + p.w * 0.9, state.groundY - p.h, p.x + p.w, state.groundY); ctx.closePath(); ctx.fill();
+            });
+        } else { 
+            ctx.fillStyle = 'rgba(180, 230, 255, 0.4)';
+            iceBgItems.forEach(p => {
+                if(!state.isCleared && !state.waitingNextStage && !state.isPaused) p.x -= p.speed * state.speedMult * (dt / 16);
+                if (p.x + p.w < -200) p.x = cw + Math.random() * 200;
+                ctx.beginPath(); ctx.moveTo(p.x, state.groundY); ctx.lineTo(p.x + p.w * 0.3, state.groundY - p.h * 0.7);
+                ctx.lineTo(p.x + p.w * 0.5, state.groundY - p.h); ctx.lineTo(p.x + p.w * 0.8, state.groundY - p.h * 0.6);
+                ctx.lineTo(p.x + p.w, state.groundY); ctx.closePath(); ctx.fill();
+            });
+        }
+        ctx.restore();
+    }
+
+    let obstacles = []; let candies = [];
+    let spawnTimer = 0; let candyTimer = 0;
+
+    function spawnItems(dt) {
+        if (state.isCleared || state.waitingNextStage) return;
+        spawnTimer += dt; candyTimer += dt;
+        
+        const baseSpeed = cw * 0.0055 * state.speedMult; 
+
+        if (spawnTimer > (2600 / state.speedMult)) {
+            spawnTimer = Math.random() * -1000; 
+            
+            let size = ch * 0.08 * [0.7, 1.0, 1.04][Math.floor(Math.random() * 3)];
+            let spawnX = cw + 100;
+            
+            if (candies.length > 0) {
+                let lastCandy = candies[candies.length - 1];
+                if (Math.abs(spawnX - lastCandy.x) < 300) {
+                    spawnX += 300; 
+                }
+            }
+            
+            let maxStack = state.stage; 
+            let stackCount = Math.floor(Math.random() * maxStack) + 1; 
+
+            for (let k = 0; k < stackCount; k++) {
+                let blockY = state.groundY - (size * (k + 1)) + (size * 0.08);
+                obstacles.push({ 
+                    x: spawnX, 
+                    y: blockY, 
+                    w: size, 
+                    h: size, 
+                    speed: baseSpeed,
+                    isBottom: (k === 0) 
+                });
+            }
+        }
+
+        if (candyTimer > (2800 / state.speedMult)) {
+            candyTimer = Math.random() * -1000;
+            const currentStageObj = stagesData[state.stage - 1];
+            const sentence = currentStageObj[state.currentSentenceIndex];
+            
+            let targetWord = sentence.words[sentence.blanks[state.currentBlankIndex]];
+            let givenWords = [];
+            for(let i=0; i<sentence.words.length; i++) {
+                if (!sentence.blanks.includes(i) || sentence.blanks.indexOf(i) < state.currentBlankIndex) {
+                    givenWords.push(sentence.words[i]);
+                }
+            }
+            
+            let isCorrect = Math.random() > 0.5; 
+            let word = "";
+            
+            if (isCorrect) {
+                word = targetWord;
+            } else {
+                if (givenWords.length > 0) {
+                    word = givenWords[Math.floor(Math.random() * givenWords.length)];
+                } else {
+                    word = targetWord; isCorrect = true;
+                }
+            }
+            
+            let spawnX = cw + 100;
+            
+            if (obstacles.length > 0) {
+                let lastObs = obstacles[obstacles.length - 1];
+                if (Math.abs(spawnX - lastObs.x) < 300) {
+                    spawnX += 300;
+                }
+            }
+            
+            let heightOffset = (Math.random() * 0.25 + 0.15) * ch; 
+            candies.push({ x: spawnX, y: state.groundY - heightOffset - 40, w: 110, h: 45, speed: baseSpeed, word, isCorrect });
+        }
+    }
+
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath(); ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius); ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height); ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius); ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+
+    function drawCandy(ctx, x, y, w, h, word) {
+        ctx.save(); 
+        ctx.translate(x + w/2, y + h/2);
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; 
+        
+        ctx.beginPath(); 
+        ctx.moveTo(-w/2 + 15, 0); ctx.lineTo(-w/2 - 10, -12); ctx.lineTo(-w/2 - 10, 12); 
+        ctx.fill(); 
+        
+        ctx.beginPath(); 
+        ctx.moveTo(w/2 - 15, 0); ctx.lineTo(w/2 + 10, -12); ctx.lineTo(w/2 + 10, 12); 
+        ctx.fill(); 
+        
+        const rw = w - 20; const rh = h;
+        const rx = -w/2 + 10; const ry = -h/2;
+        const radius = h/2;
+
+        ctx.beginPath(); 
+        ctx.moveTo(rx + radius, ry); 
+        ctx.lineTo(rx + rw - radius, ry);
+        ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius); 
+        ctx.lineTo(rx + rw, ry + rh - radius);
+        ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh); 
+        ctx.lineTo(rx + radius, ry + rh);
+        ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius); 
+        ctx.lineTo(rx, ry + radius);
+        ctx.quadraticCurveTo(rx, ry, rx + radius, ry); 
+        ctx.closePath(); 
+        ctx.fill(); 
+        
+        ctx.fillStyle = '#FFFFFF'; 
+        ctx.font = "bold 20px 'Noto Sans KR', sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; 
+        ctx.fillText(word, 0, 2);
+        
+        ctx.restore();
+    }
+
+    function spawnFloatingText(x, y, text, color, size = 30) {
+        particles.push({ x, y, vy: -2, life: 60, text, color, size });
+    }
+
+    function drawParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            if (!state.isPaused) {
+                p.y += p.vy; p.life--;
+            }
+            ctx.globalAlpha = Math.max(0, p.life / 60);
+            ctx.fillStyle = p.color;
+            ctx.font = `bold ${p.size}px 'Noto Sans KR', sans-serif`;
+            ctx.textAlign = "center";
+            ctx.fillText(p.text, p.x, p.y);
+            ctx.globalAlpha = 1.0;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function updateAndDrawItems(dt) {
+        if (state.isCleared || state.waitingNextStage) return;
+        const hitX = dino.x + dino.w * 0.35; const hitW = dino.w * 0.3;
+        const hitY = dino.y + dino.h * 0.35; const hitH = dino.h * 0.55;
+
+        for (let i = 0; i < obstacles.length; i++) {
+            let obs = obstacles[i];
+            if (obs.isBottom) {
+                ctx.save(); ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.beginPath();
+                ctx.ellipse(Math.round(obs.x + obs.w / 2), Math.round(state.groundY + 5), Math.round(obs.w * 0.50), Math.round(obs.h * 0.08), 0, 0, Math.PI * 2);
+                ctx.fill(); ctx.restore();
+            }
+        }
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
+            obs.x -= obs.speed * (dt / 16);
+
+            if (state.stage === 1) { ctx.fillStyle = '#C19A6B'; ctx.strokeStyle = '#8C6239'; }
+            else if (state.stage === 2) { ctx.fillStyle = '#A0A0A0'; ctx.strokeStyle = '#505050'; }
+            else { ctx.fillStyle = '#B3E5FC'; ctx.strokeStyle = '#0288D1'; }
+            
+            ctx.lineWidth = 4; drawRoundedRect(ctx, obs.x, obs.y, obs.w, obs.h, 12);
+
+            if (!dino.hitShakeActive && hitX < obs.x + obs.w && hitX + hitW > obs.x && hitY < obs.y + obs.h && hitY + hitH > obs.y) {
+                obstacles.splice(i, 1); 
+                takeDamage(); 
+                continue;
+            }
+            if (obs.x + obs.w < 0) obstacles.splice(i, 1);
+        }
+
+        for (let i = candies.length - 1; i >= 0; i--) {
+            let c = candies[i];
+            c.x -= c.speed * (dt / 16);
+            drawCandy(ctx, c.x, c.y, c.w, c.h, c.word);
+            
+            if (hitX < c.x + c.w && hitX + hitW > c.x && hitY < c.y + c.h && hitY + hitH > c.y) {
+                playTTS(c.word);
+
+                if (c.isCorrect) {
+                    state.currentBlankIndex++; 
+                    state.score += 30;
+                    playAudio('eat'); 
+                    spawnFloatingText(c.x, c.y, "+30", "#4CAF50");
+                    updateSentenceBoard(); checkStageClear();
+                } else {
+                    state.score -= 20; 
+                    playAudio('hit'); 
+                    spawnFloatingText(c.x, c.y, "-20", "#F44336");
+                }
+                candies.splice(i, 1); continue;
+            }
+            if (c.x + c.w < 0) candies.splice(i, 1);
+        }
+    }
+
+    // 💡 [클리어 로직 개편] 스테이지 완료 시 모달창(최상단 레이어) 표시
+    function showStageClearModal() {
+        state.waitingNextStage = true;
+        state.isPaused = true;
+        stopBGM();
+        window.speechSynthesis.cancel();
+        
+        msgTitle.innerText = `STAGE ${state.stage} CLEAR!`; 
+        msgTitle.style.color = "#FFEB3B";
+        msgDesc.innerHTML = `잘하셨습니다!<br>현재까지 점수: ${state.score}`;
+        startBtn.innerText = "다음 스테이지로"; 
+        
+        msgBox.style.display = 'block';
+    }
+
+    function checkStageClear() {
+        const currentStageObj = stagesData[state.stage - 1];
+        const sentence = currentStageObj[state.currentSentenceIndex];
+        
+        if (state.currentBlankIndex >= sentence.blanks.length) {
+            state.currentSentenceIndex++;
+            state.currentBlankIndex = 0;
+            
+            if (state.currentSentenceIndex >= currentStageObj.length) {
+                if (state.stage === 3) {
+                    gameClear();
+                } else {
+                    // 다음 스테이지로 넘어가기 전 모달창 호출
+                    showStageClearModal();
+                }
+            } else {
+                updateSentenceBoard();
+                // 텍스트 블록에 가려지지 않도록 화면 중앙 약간 아래에서 텍스트 플로팅
+                spawnFloatingText(cw/2, ch/2 + 60, "NEXT SENTENCE!", "#4CAF50", 60);
+                
+                const nextSentence = currentStageObj[state.currentSentenceIndex].words.join(' ');
+                playTTS(nextSentence);
+            }
+        }
+    }
+
+    // 💡 모달창 버튼(또는 화면/스페이스바) 클릭 시 다음 스테이지 세팅
+    function nextStage() {
+        state.waitingNextStage = false;
+        state.isPaused = false;
+        state.stage++;
+        state.currentSentenceIndex = 0;
+        state.currentBlankIndex = 0;
+        
+        obstacles = []; candies = []; particles = []; fireworks = [];
+        dino.isHolding = false;
+        dino.isJumping = false;
+        dino.y = state.groundY; 
+        dino.vy = 0;
+        
+        msgBox.style.display = 'none';
+        
+        updateThemeCSS(); 
+        updateSentenceBoard(); 
+        startBGM();
+        
+        const firstSentence = stagesData[state.stage - 1][0].words.join(' ');
+        playTTS(firstSentence);
+        
+        lastTime = performance.now(); 
+        requestAnimationFrame(gameLoop);
+    }
+
+    function drawGround() {
+        let colors = ['#B08D57', '#1B4D20', '#e0f7fa']; 
+        ctx.fillStyle = colors[state.stage - 1]; 
+        ctx.fillRect(0, state.groundY, cw, ch - state.groundY);
+    }
+
+    function spawnFirework() {
+        let x = cw * 0.2 + Math.random() * (cw * 0.6);
+        let y = ch * 0.1 + Math.random() * (ch * 0.4);
+        for(let i=0; i<40; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let speed = Math.random() * 6 + 2;
+            fireworks.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                life: 100, maxLife: 100,
+                color: `hsl(${Math.random()*360}, 100%, 60%)`
+            });
+        }
+    }
+
+    function drawFireworks() {
+        if (state.isCleared && Math.random() < 0.08) spawnFirework();
+        for (let i = fireworks.length - 1; i >= 0; i--) {
+            let p = fireworks[i];
+            p.x += p.vx; p.y += p.vy; p.vy += 0.1;
+            p.life--;
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1.0;
+            if (p.life <= 0) fireworks.splice(i, 1);
+        }
+    }
+
+    let lastTime = 0;
+    function gameLoop(timestamp) {
+        if (!state.isPlaying && !state.isCleared) return;
+        let dt = timestamp - lastTime;
+        lastTime = timestamp;
+        if (dt > 100) dt = 16; 
+
+        if (!state.isPaused) {
+            ctx.clearRect(0, 0, cw, ch); 
+            scoreBoard.innerText = `SCORE: ${state.score}`; 
+            
+            drawSkyObjects(dt); 
+            drawGround(); 
+            dino.drawShadow(); 
+            spawnItems(dt); 
+            updateAndDrawItems(dt);
+            dino.update(dt); 
+            dino.draw();
+            drawParticles();
+            drawFireworks();
+        } else if (state.waitingNextStage || state.isPaused) {
+            // 일시정지 상태에서도 현재 화면 프레임 유지를 위해 계속 그려줌
+            ctx.clearRect(0, 0, cw, ch); 
+            drawSkyObjects(0); 
+            drawGround(); 
+            dino.drawShadow(); 
+            
+            for (let obs of obstacles) {
+                if (state.stage === 1) { ctx.fillStyle = '#C19A6B'; ctx.strokeStyle = '#8C6239'; }
+                else if (state.stage === 2) { ctx.fillStyle = '#A0A0A0'; ctx.strokeStyle = '#505050'; }
+                else { ctx.fillStyle = '#B3E5FC'; ctx.strokeStyle = '#0288D1'; }
+                ctx.lineWidth = 4; drawRoundedRect(ctx, obs.x, obs.y, obs.w, obs.h, 12);
+                if (obs.isBottom) {
+                    ctx.save(); ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'; ctx.beginPath();
+                    ctx.ellipse(Math.round(obs.x + obs.w / 2), Math.round(state.groundY + 5), Math.round(obs.w * 0.50), Math.round(obs.h * 0.08), 0, 0, Math.PI * 2);
+                    ctx.fill(); ctx.restore();
+                }
+            }
+            
+            for (let c of candies) { drawCandy(ctx, c.x, c.y, c.w, c.h, c.word); }
+            dino.draw();
+            drawParticles();
+        }
+        
+        if(state.isPlaying || state.isCleared) {
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function updateSentenceBoard() {
+        if(state.stage > 3) return;
+        const currentStageObj = stagesData[state.stage - 1];
+        const sentence = currentStageObj[state.currentSentenceIndex];
+        let html = "";
+        
+        for(let i=0; i<sentence.words.length; i++) {
+            let word = sentence.words[i];
+            if (sentence.blanks.includes(i)) {
+                let blankOrder = sentence.blanks.indexOf(i);
+                if (blankOrder < state.currentBlankIndex) {
+                    html += `<div class="pattern-filled">${word}</div>`;
+                } else {
+                    html += `<div class="pattern-empty">&nbsp;&nbsp;</div>`;
+                }
+            } else {
+                html += `<span>${word}</span>`;
+            }
+        }
+        sentenceBoard.innerHTML = html;
+    }
+
+    function updateThemeCSS() {
+        let bgGradient = "";
+        if (state.stage === 1) { 
+            stageBoard.innerText = "STAGE 1: DESERT"; bgGradient = "linear-gradient(180deg, #4ba3e3 0%, #ffcc80 100%)";
+        } else if (state.stage === 2) { 
+            stageBoard.innerText = "STAGE 2: SUNSET"; bgGradient = "linear-gradient(180deg, #281c3c 0%, #b34138 100%)";
+        } else { 
+            stageBoard.innerText = "STAGE 3: ARCTIC"; bgGradient = "linear-gradient(180deg, #011627 0%, #1a2a6c 60%, #b2ebf2 100%)";
+        }
+        canvas.style.background = bgGradient; 
+        blurredBg.style.background = bgGradient;
+    }
+
+    function takeDamage() {
+        state.lives--;
+        let hText = '';
+        for (let i = 0; i < state.lives; i++) hText += '❤️';
+        for (let i = state.lives; i < 3; i++) hText += '🖤';
+        heartsBoard.innerText = hText;
+
+        playAudio('hit'); dino.triggerHitShake(); 
+        damageOverlay.classList.add('red-flash');
+        setTimeout(() => damageOverlay.classList.remove('red-flash'), 300);
+        if (state.lives <= 0) gameOver();
+    }
+
+    function startGame() {
+        state.isPlaying = true; state.isPaused = false; state.isCleared = false; state.waitingNextStage = false;
+        state.score = 0; state.lives = 3; state.jumpCount = 0; state.speedMult = 1.0; 
+        state.stage = 1; state.currentSentenceIndex = 0; state.currentBlankIndex = 0;
+        obstacles = []; candies = []; particles = []; fireworks = [];
+        dino.isHolding = false; dino.isJumping = false; dino.y = state.groundY; dino.vy = 0;
+        
+        heartsBoard.innerText = '❤️❤️❤️';
+        msgBox.style.display = 'none'; pauseBtn.style.display = 'block'; pauseBtn.innerText = 'PAUSE';
+        
+        initAudio(); initTTS(); 
+        initBackgroundObjects(); updateThemeCSS(); updateSentenceBoard(); startBGM();
+        
+        const firstSentence = stagesData[0][0].words.join(' ');
+        playTTS(firstSentence);
+        
+        lastTime = performance.now(); requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+        state.isPlaying = false; stopBGM(); pauseBtn.style.display = 'none';
+        msgTitle.innerText = "GAME OVER"; 
+        msgTitle.style.color = "#B71C1C";
+        msgDesc.innerHTML = `앗! 장애물에 3번 부딪혔습니다.<br>최종 점수: ${state.score}`;
+        startBtn.innerText = "다시 시작하기"; msgBox.style.display = 'block';
+    }
+
+    function gameClear() {
+        state.isPlaying = false; state.isCleared = true;
+        stopBGM(); pauseBtn.style.display = 'none';
+        
+        let randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26)); 
+        
+        msgTitle.innerText = "🎉 GAME CLEAR! 🎉"; 
+        msgTitle.style.color = "#4CAF50";
+        msgDesc.innerHTML = `
+            축하합니다! 모든 문장을 완성했습니다!<br><br>
+            🎁 <b>최종 보석 상자를 열었습니다!</b><br>
+            💎 획득한 알파벳 보석: <strong style="font-size: 28px; color:#00E5FF; text-shadow: 1px 1px 2px #000;">[ ${randomChar} ]</strong><br><br>
+            🏆 최종 점수: ${state.score}
+        `;
+        startBtn.innerText = "다시 시작하기"; 
+        
+        setTimeout(() => { msgBox.style.display = 'block'; }, 1000);
+    }
+
+    function togglePause() {
+        if (!state.isPlaying || state.isCleared || state.waitingNextStage) return; // 스테이지 전환 대기 중엔 토글 불가
+        state.isPaused = !state.isPaused;
+        
+        if (state.isPaused) {
+            pauseBtn.innerText = "RESUME"; stopBGM(); window.speechSynthesis.cancel();
+            msgTitle.innerText = "PAUSED"; msgTitle.style.color = "#B71C1C";
+            msgDesc.innerHTML = `현재 점수: ${state.score}`;
+            startBtn.innerText = "이어하기"; msgBox.style.display = 'block';
+        } else {
+            pauseBtn.innerText = "PAUSE"; startBGM();
+            msgBox.style.display = 'none'; lastTime = performance.now(); 
+        }
+    }
+
+    // 💡 [클릭/키 조작 일원화] 모달창이 떠있을 때의 진행 로직
+    function proceedFromModal() {
+        if (imagesLoaded < totalImages) return;
+        if (state.waitingNextStage) {
+            nextStage();
+        } else if (state.isPaused) {
+            togglePause();
+        } else {
+            startGame();
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (msgBox.style.display === 'block') { proceedFromModal(); } 
+            else if (state.isPlaying && !state.isPaused && !state.waitingNextStage) { dino.jump(); }
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') { dino.releaseJump(); }
+    });
+    
+    // 모달창이 열려있을 때 캔버스를 터치/클릭해도 다음으로 넘어감
+    window.addEventListener('touchstart', (e) => {
+        if (msgBox.style.display === 'block') {
+            if (e.target !== startBtn) proceedFromModal(); 
+        } else if (e.target.tagName !== 'BUTTON' && state.isPlaying && !state.isPaused && !state.waitingNextStage) {
+            dino.jump();
+        }
+    });
+    window.addEventListener('touchend', (e) => {
+        dino.releaseJump();
+    });
+    
+    window.addEventListener('mousedown', (e) => {
+        if (msgBox.style.display === 'block') {
+            if (e.target !== startBtn) proceedFromModal();
+        } else if (e.button === 0 && e.target.tagName !== 'BUTTON' && state.isPlaying && !state.isPaused && !state.waitingNextStage) {
+            dino.jump();
+        }
+    });
+    window.addEventListener('mouseup', (e) => {
+        if (e.button === 0) dino.releaseJump();
+    });
+
+    startBtn.addEventListener('click', proceedFromModal);
+    pauseBtn.addEventListener('click', togglePause);
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx; let bgmTimer; let noteIndex = 0;
+    
+    function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    
+    function playAudio(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'jump') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'hit') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        } else if (type === 'eat') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+        }
+    }
+
+    const melodies = [
+        [220.00, 233.08, 277.18, 293.66, 329.63, 277.18, 233.08, 220.00, 329.63, 349.23, 415.30, 440.00, 415.30, 349.23, 329.63, 293.66],
+        [587.33, 659.25, 783.99, 880.00, 1046.50, 880.00, 783.99, 659.25, 523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 523.25, 493.88],
+        [330.00, 392.00, 440.00, 493.88, 523.25, 493.88, 440.00, 392.00, 330.00, 440.00, 523.25, 587.33, 659.25, 587.33, 523.25, 440.00]
+    ];
+
+    function startBGM() {
+        stopBGM(); noteIndex = 0;
+        bgmTimer = setInterval(() => {
+            if (!audioCtx || state.isPaused || state.isCleared || state.waitingNextStage) return;
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = state.stage === 1 ? 'sawtooth' : state.stage === 2 ? 'sine' : 'triangle';
+            let m = melodies[state.stage - 1];
+            osc.frequency.value = m[noteIndex % m.length];
+            gain.gain.setValueAtTime(0.04, audioCtx.currentTime); 
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+            noteIndex++;
+        }, 180);
+    }
+    function stopBGM() { if (bgmTimer) clearInterval(bgmTimer); }
+
+    msgBox.style.display = 'block';
+    initBackgroundObjects(); updateThemeCSS(); updateSentenceBoard(); initTTS();
+
+    function checkAllImagesLoaded() {
+        if (imagesLoaded === totalImages) {
+            
+            for (let key in images) {
+                if (images[key].complete && images[key].naturalWidth !== 0) {
+                    ctx.drawImage(images[key], -100, -100, 1, 1); 
+                }
+            }
+
+            msgTitle.innerText = "AX Lab 문장 게임 How to play?";
+            msgDesc.innerHTML = `
+                1. 게임을 시작하면 점프(space bar, 좌클릭)해서 장애물을 피하고 단어 사탕을 먹습니다.<br>
+                2. 문장을 완성할 단어 사탕을 먹어야 하고 불필요한 사탕을 먹으면 감점됩니다.<br>
+                3. 장애물에 3번 부딪히면 게임 오버입니다.<br>
+                4. 문장을 모두 완성하면 최종 보석상자를 열어 알파벳을 획득하세요!
+            `;
+            startBtn.style.display = 'inline-block';
+        }
+    }
+
+    for (let key in imageSources) {
+        images[key] = new Image();
+        images[key].onload = () => { imagesLoaded++; checkAllImagesLoaded(); };
+        images[key].onerror = () => { imagesLoaded++; checkAllImagesLoaded(); };
+        images[key].src = imageSources[key];
+    }
+</script>
+</body>
+</html>
